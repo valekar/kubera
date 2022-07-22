@@ -6,18 +6,18 @@ module Kubera::KuberaConfig {
         @Kubera
     }
 
-    struct LendingMarket has store {
+    struct LendingMarket has key ,store {
         version : u8,
         authority : address
    }
 
-   public(script) fun initialize_lending_market(sender : &signer, version : u8) : LendingMarket {
-
-        LendingMarket {
+   public fun initialize_lending_market(sender : &signer, version : u8)  {
+      let lending_market =   LendingMarket {
             version : version,
             authority : Signer::address_of(sender)
-        }
+        };
 
-   }
+        move_to<LendingMarket>(sender, lending_market);
+    }
 
 }
