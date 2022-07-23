@@ -59,7 +59,8 @@ module Kubera::Pool {
        };
 
         
-       intialize_reserve_collateral<LPCoin>(sender, lp_coin_name, symbol, decimals);
+       intialize_reserve_coin<LPCoin>(sender, lp_coin_name, symbol, decimals);
+       
 
        
         let liquidity = ReserveLiquidy<ReserveCoin> {
@@ -89,7 +90,7 @@ module Kubera::Pool {
     }
     
     
-    fun intialize_reserve_collateral<CoinType>(sender : &signer, lp_coin_name : ASCII::String , symbol : ASCII::String, decimals : u64) {
+    fun intialize_reserve_coin<CoinType>(sender : &signer, lp_coin_name : ASCII::String , symbol : ASCII::String, decimals : u64) {
         assert!(!Coin::is_coin_initialized<CoinType>(), ERROR_ALREADY_INITIALIZED);
         let (mint_capability, burn_capability) = Coin::initialize<CoinType>(
             sender, lp_coin_name, symbol, decimals, true
