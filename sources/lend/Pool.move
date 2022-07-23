@@ -2,7 +2,7 @@ module Kubera::Pool {
 
     use Std::ASCII;
     use AptosFramework::Coin;
-    //use Std::Signer;
+    use Std::Signer;
     use Kubera::KuberaConfig;
     use AptosFramework::Timestamp;
 
@@ -34,12 +34,37 @@ module Kubera::Pool {
     }
 
     struct ReserveConfig has store {
-        fee : ReserveFee
+        optimal_utilization_rate: u8,
+        // Target ratio of the value of borrows to deposits, as a percentage
+        // 0 if use as collateral is disabled
+        loan_to_value_ratio: u8,
+        /// Bonus a liquidator gets when repaying part of an unhealthy obligation, as a percentage
+        liquidation_bonus: u8,
+        /// Loan to value ratio at which an obligation can be liquidated, as a percentage
+        liquidation_threshold: u8,
+        /// Min borrow APY
+        min_borrow_rate: u8,
+        /// Optimal (utilization) borrow APY
+        optimal_borrow_rate: u8,
+        /// Max borrow APY
+        max_borrow_rate: u8,
+        /// Program owner fees assessed, separate from gains due to interest accrual
+        fees: ReserveFees,
+        /// Maximum deposit limit of liquidity in native units, u64::MAX for inf
+        deposit_limit: u64,
+        /// Borrows disabled
+        borrow_limit: u64,
+        /// Reserve liquidity fee receiver address
+        fee_receiver: address,
+        /// Cut of the liquidation bonus that the protocol receives, as a percentage
+        protocol_liquidation_fee: u8,
+        /// Protocol take rate is the amount borrowed interest protocol recieves, as a percentage  
+        protocol_take_rate: u8,
     } 
 
 
-    struct ReserveFee has key, store {
-        borrow_fee : u64
+    struct ReserveFees has key, store {
+        borrow_fees : u64
     }
 
 
@@ -49,19 +74,18 @@ module Kubera::Pool {
 
 
     public fun create_reserve<LPCoin, ReserveCoin>(
-        sender : &signer,name : ASCII::String, borrow_fee : u64, 
+        sender : &signer,name : ASCII::String, reserve_config : ReserveConfig, 
         lp_coin_name : ASCII::String , symbol : ASCII::String, decimals : u64
     ) {
+       let addr = Signer::address_of(sender);
 
-        //let addr = Signer::address_of(sender);
+        assert!(!exists<Reserve<LPCoin, ReserveCoin>>(addr), ERROR_ALREADY_INITIALIZED);
+
        let last_update = LastUpdate {
           block_timestamp_last :  Timestamp::now_seconds() % 0xFFFFFFFF 
        };
 
-        
-       intialize_reserve_coin<LPCoin>(sender, lp_coin_name, symbol, decimals);
-       
-
+       intialize_collateral_coin<LPCoin>(sender, lp_coin_name, symbol, decimals);
        
         let liquidity = ReserveLiquidy<ReserveCoin> {
             liquidity_coin : Coin::zero<ReserveCoin>()
@@ -71,18 +95,12 @@ module Kubera::Pool {
             collateral_coin : Coin::zero<LPCoin>()
         };
 
-        let config = ReserveConfig {
-            fee : ReserveFee {
-                borrow_fee : borrow_fee
-            }
-        };
-
         let reserve = Reserve<LPCoin, ReserveCoin> {
             name : name,
             last_update : last_update,
             liquidity : liquidity,
             collateral : collateral,
-            config : config
+            config : reserve_config
         };
 
         move_to<Reserve<LPCoin, ReserveCoin>>(sender, reserve);
@@ -90,7 +108,7 @@ module Kubera::Pool {
     }
     
     
-    fun intialize_reserve_coin<CoinType>(sender : &signer, lp_coin_name : ASCII::String , symbol : ASCII::String, decimals : u64) {
+    fun intialize_collateral_coin<CoinType>(sender : &signer, lp_coin_name : ASCII::String , symbol : ASCII::String, decimals : u64) {
         assert!(!Coin::is_coin_initialized<CoinType>(), ERROR_ALREADY_INITIALIZED);
         let (mint_capability, burn_capability) = Coin::initialize<CoinType>(
             sender, lp_coin_name, symbol, decimals, true
@@ -111,7 +129,7 @@ module Kubera::Pool {
 
    }
 
-   fun fetch_pool_balance<LPCoin, ReserveCoin>() : (u64, u64) acquires Reserve {
+   public fun fetch_pool_balance<LPCoin, ReserveCoin>() : (u64, u64) acquires Reserve {
     let pool = borrow_global<Reserve<LPCoin,ReserveCoin>>(KuberaConfig::admin_address());
     let collateral_coin = Coin::value(&pool.collateral.collateral_coin);
     let liquidity_coin = Coin::value(&pool.liquidity.liquidity_coin);
@@ -119,11 +137,6 @@ module Kubera::Pool {
     (collateral_coin, liquidity_coin)
    }
 
-
-    // fun tsest(sender : &signer) {
-
-    //     MockDeploy::init_coin_and_create_store<MockCoin::WUSDC>(admin, b"USDC", b"USDC", 8);
-    // }
-
+ 
 
 }
