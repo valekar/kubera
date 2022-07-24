@@ -21,6 +21,7 @@ module kubera::PoolScript {
         max_borrow_rate: u8,
         fees : u64,
         deposit_limit: u64,
+        user_deposit_limit : u64,
         borrow_limit: u64,
         protocol_liquidation_fee: u8,
         protocol_take_rate: u8
@@ -40,6 +41,7 @@ module kubera::PoolScript {
             max_borrow_rate,
             fees ,
             deposit_limit,
+            user_deposit_limit,
             borrow_limit,
             protocol_liquidation_fee,
             protocol_take_rate
@@ -50,11 +52,12 @@ module kubera::PoolScript {
     #[test(source = @kubera)]
     public entry fun init_reserve_test(source : signer) {
         MockCoin::initialize<MockCoin::WETH>(&source, 8);
-        init_reserve<MockCoin::WETH>(&source,string::utf8(
-            b"WETH Reserve"), 
+        init_reserve<MockCoin::WETH>(
+            &source,
+            string::utf8(b"WETH Reserve"), 
             string::utf8(b"LPCoin"), 
             string::utf8(b"LPWETH"),
-            8, 2, 6, 1, 80, 10, 13, 50, 10, 100, 80, 2, 1
+            8, 2, 6, 1, 80, 10, 13, 50, 10, 100, 100,80, 2, 1
         );
 
         //debug::print_stack_trace();

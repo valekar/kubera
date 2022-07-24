@@ -13,7 +13,7 @@ module kubera::pool {
         name : String,
         //last_update : LastUpdate, 
         liquidity : ReserveLiquidy<ReserveCoin>,
-        collateral : ReserveCollateral<ReserveCoin>,
+        collateral : ReserveLP<ReserveCoin>,
         config : ReserveConfig
 
     }
@@ -31,8 +31,8 @@ module kubera::pool {
      liquidity_coin : coin::Coin<ReserveCoin>
     }
 
-    struct ReserveCollateral<phantom ReserveCoin> has  store {
-       collateral_coin : coin::Coin<LPCoin<ReserveCoin>>,
+    struct ReserveLP<phantom ReserveCoin> has  store {
+       lp_coins : coin::Coin<LPCoin<ReserveCoin>>,
     }
 
     struct ReserveConfig has store {
@@ -53,6 +53,8 @@ module kubera::pool {
         fees: ReserveFees,
         /// Maximum deposit limit of liquidity in native units, u64::MAX for inf
         deposit_limit: u64,
+        //Max user deposit limit
+        user_deposit_limit : u64,
         /// Borrows disabled
         borrow_limit: u64,
         /// Reserve liquidity fee receiver address
@@ -70,8 +72,11 @@ module kubera::pool {
 
 
     const ERROR_ALREADY_INITIALIZED:u64 = 1;
-    const COIN_ALREADY_INITIALIZED:u64 = 2000;
     const ERROR_RESORUCE_DOES_NOT_EXISTS:u64 = 2;
+
+    const ERROR_DEPOSIT_LIMIT_REACHED:u64 = 2001;
+    const ERROR_INSUFFICIENT_BALANCE:u64 = 2002;
+
 
 
     public fun create_reserve<ReserveCoin>(
@@ -89,6 +94,7 @@ module kubera::pool {
         max_borrow_rate: u8,
         fees : u64,
         deposit_limit: u64,
+        user_deposit_limit : u64,
         borrow_limit: u64,
         protocol_liquidation_fee: u8,
         protocol_take_rate: u8
@@ -118,8 +124,8 @@ module kubera::pool {
             liquidity_coin : coin::zero<ReserveCoin>()
         };
 
-        let collateral = ReserveCollateral<ReserveCoin> {
-            collateral_coin : coin::zero<LPCoin<ReserveCoin>>(),
+        let collateral = ReserveLP<ReserveCoin> {
+            lp_coins : coin::zero<LPCoin<ReserveCoin>>(),
         };
 
         let reserve = Reserve<ReserveCoin> {
@@ -139,6 +145,7 @@ module kubera::pool {
                         borrow_fees : fees
                     },
                     deposit_limit: deposit_limit,
+                    user_deposit_limit : user_deposit_limit,
                     borrow_limit: borrow_limit,
                     fee_receiver: addr,
                     protocol_liquidation_fee: protocol_liquidation_fee,
@@ -167,13 +174,13 @@ module kubera::pool {
         assert!(exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
         let pool = borrow_global_mut<Reserve<ReserveCoin>>(kubera_config::admin_address());
         
-        let collateral_coin = &mut pool.collateral.collateral_coin;
+        let lp_coins = &mut pool.collateral.lp_coins;
 
         let minted = mint<ReserveCoin>(addr,amount);
 
-        coin::merge(collateral_coin, minted);
+        coin::merge<LPCoin<ReserveCoin>>(lp_coins, minted);
         
-        coin::value(collateral_coin)
+        coin::value(lp_coins)
 
    }
 
@@ -188,10 +195,138 @@ module kubera::pool {
         let addr = kubera_config::admin_address();
         assert!(exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
         let pool = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
-        let collateral_coin = coin::value(&pool.collateral.collateral_coin);
+        let lp_coins = coin::value(&pool.collateral.lp_coins);
         let liquidity_coin = coin::value(&pool.liquidity.liquidity_coin);
-        (collateral_coin, liquidity_coin)
+        (lp_coins, liquidity_coin)
    }
 
+
+    public fun deposit_liquidity_direct<ReserveCoin>(sender : &signer, liquidity_amount : u64) acquires Reserve, LPCapability {
+        //first get allowed user deposit limit
+        let allowed_lp_coins = get_user_deposit_limit<ReserveCoin>(signer::address_of(sender), liquidity_amount);
+        // then get reserve deposit limit
+        let mintable_lp_coins_limit = get_reserve_deposit_limit<ReserveCoin>(signer::address_of(sender), allowed_lp_coins);
+
+        deposit_liquidity<ReserveCoin>(sender, mintable_lp_coins_limit, mintable_lp_coins_limit);
+
+    }
+   
+
+    // WARNING : Need validation
+    fun deposit_liquidity<ReserveCoin>(sender: &signer,liquidity_amount: u64, lp_amount : u64) acquires Reserve, LPCapability {
+        assert_reserve_exists<ReserveCoin>();
+
+        let admin_addr = kubera_config::admin_address();
+        let reserve = borrow_global_mut<Reserve<ReserveCoin>>(admin_addr);
+
+
+        let liquidity_coins = coin::withdraw<ReserveCoin>(sender, liquidity_amount);
+        let reserve_liquidity_coin = &mut reserve.liquidity.liquidity_coin;
+        coin::merge<ReserveCoin>(reserve_liquidity_coin, liquidity_coins);
+
+
+
+        let balance_reserve_lp_coins = coin::balance<LPCoin<ReserveCoin>>(admin_addr);
+
+        // if reserve lp balance is less, then mint the LPs and add them to reserve first;
+        if (balance_reserve_lp_coins < lp_amount) {
+            let lp_coins = &mut reserve.collateral.lp_coins;
+            let minted = mint<ReserveCoin>(admin_addr, lp_amount - balance_reserve_lp_coins );
+            coin::merge<LPCoin<ReserveCoin>>(lp_coins, minted);
+        };
+
+        // then extract the lps - this is done for the recording purpose 
+        let lp_coins = &mut reserve.collateral.lp_coins;
+        let extracted_lp_coins = coin::extract<LPCoin<ReserveCoin>>(lp_coins, lp_amount);
+        coin::deposit<LPCoin<ReserveCoin>>(signer::address_of(sender), extracted_lp_coins);
+
+   }
+    /// WARNING : need validation
+    public fun withdraw_liquidity<ReserveCoin>(sender : &signer, lp_amount : u64) acquires Reserve {
+        assert_reserve_exists<ReserveCoin>();
+        assert_lp_greater_than_zero<ReserveCoin>(signer::address_of(sender));
+
+
+        let admin_addr = kubera_config::admin_address();
+        assert_lp_greater_than_zero<ReserveCoin>(signer::address_of(sender));
+
+
+        let balance_liquidity_coins = coin::balance<ReserveCoin>(admin_addr);
+        assert!(balance_liquidity_coins > lp_amount, ERROR_INSUFFICIENT_BALANCE);
+
+        let extractable_liquidity_coins = if (balance_liquidity_coins > lp_amount){
+            lp_amount
+        }
+        else {
+            balance_liquidity_coins
+        };
+
+
+        let lp_coins = coin::withdraw<LPCoin<ReserveCoin>>(sender, extractable_liquidity_coins);
+
+        let reserve = borrow_global_mut<Reserve<ReserveCoin>>(admin_addr);
+        //transfer lp coins back to reserve
+        let reserve_lp_coins = &mut reserve.collateral.lp_coins;
+        coin::merge<LPCoin<ReserveCoin>>(reserve_lp_coins, lp_coins);
+        //transfer liquidity coins to sender
+        let reserve_liquidity_coins = &mut reserve.liquidity.liquidity_coin;
+        let extracted_liquidity_coins = coin::extract<ReserveCoin>(reserve_liquidity_coins, extractable_liquidity_coins);
+        coin::deposit<ReserveCoin>(signer::address_of(sender), extracted_liquidity_coins);
+
+    }
+
  
+    fun assert_reserve_exists<ReserveCoin>() {
+        let addr = kubera_config::admin_address();
+        assert!(exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);  
+    }
+
+    fun assert_lp_greater_than_zero<ReserveCoin>(addr : address) {
+        let balance_lp_coins = coin::balance<LPCoin<ReserveCoin>>(addr);
+        assert!(balance_lp_coins > 0 , ERROR_INSUFFICIENT_BALANCE);
+
+    }
+
+
+    fun get_user_deposit_limit<ReserveCoin>(addr : address, requested_amount : u64): u64 acquires Reserve{
+        let reserve = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
+
+        let user_deposit_limit = reserve.config.user_deposit_limit;
+
+        let user_coin_balance = coin::balance<ReserveCoin>(addr);
+
+        assert!(user_deposit_limit>user_coin_balance + requested_amount, ERROR_DEPOSIT_LIMIT_REACHED);
+
+        let allowed_deposit = user_deposit_limit - (user_coin_balance + requested_amount);
+        
+        if(allowed_deposit > requested_amount) {
+            requested_amount
+        }
+        else {
+            allowed_deposit
+        }
+
+    } 
+
+    fun get_reserve_deposit_limit<ReserveCoin>(addr : address, requested_amount : u64): u64 acquires Reserve{
+        let reserve = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
+
+        let deposit_limit = reserve.config.deposit_limit;
+
+        let user_coin_balance = coin::balance<ReserveCoin>(addr);
+
+        assert!(deposit_limit>user_coin_balance + requested_amount, ERROR_DEPOSIT_LIMIT_REACHED);
+
+        let allowed_deposit = deposit_limit - (user_coin_balance + requested_amount);
+        
+        if(allowed_deposit > requested_amount) {
+            requested_amount
+        }
+        else {
+            allowed_deposit
+        }
+    } 
+
+
+
 }
