@@ -4,14 +4,14 @@ module Kubera::Pool {
     use aptos_framework::coin;
     use std::signer;
     use Kubera::kubera_config;
-    use aptos_framework::timestamp;
+    //use aptos_framework::timestamp;
 
 
     struct LPCoin<phantom ReserveCoin> {}
 
     struct Reserve<phantom ReserveCoin> has key{
         name : String,
-        last_update : LastUpdate, 
+        //last_update : LastUpdate, 
         liquidity : ReserveLiquidy<ReserveCoin>,
         collateral : ReserveCollateral<ReserveCoin>,
         config : ReserveConfig
@@ -97,9 +97,9 @@ module Kubera::Pool {
 
         assert!(!exists<Reserve<ReserveCoin>>(addr), ERROR_ALREADY_INITIALIZED);
 
-       let last_update = LastUpdate {
-          block_timestamp_last :  timestamp::now_seconds() % 0xFFFFFFFF 
-       };
+    //    let last_update = LastUpdate {
+    //       block_timestamp_last :  timestamp::now_seconds()
+    //    };
 
        intialize_collateral_coin<LPCoin<ReserveCoin>>(sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals);
        
@@ -113,7 +113,7 @@ module Kubera::Pool {
 
         let reserve = Reserve<ReserveCoin> {
             name : reserve_name,
-            last_update : last_update,
+            //last_update : last_update,
             liquidity : liquidity,
             collateral : collateral,
             config : ReserveConfig {

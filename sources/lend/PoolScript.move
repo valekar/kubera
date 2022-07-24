@@ -1,8 +1,8 @@
 module Kubera::PoolScript {
 
     use Kubera::Pool;
-    use std::string::{String};
-    //use Kubera::MockCoin;
+    use std::string::{String,Self};
+    use Kubera::MockCoin;
 
     public entry fun init_reserve<ReserveCoin>(
         admin : &signer , 
@@ -45,29 +45,16 @@ module Kubera::PoolScript {
 
     }
 
-    // #[test(source = @0x1)]
-    // public entry fun init_reserve_test(source : signer) {
-    //     MockCoin::initialize<MockCoin::WETH>(&source, 8);
-    //     init_reserve<MockCoin::WETH>(
-    //         &source,
-    //         string::utf8(b"WETH Reserve"),
-    //         string::utf8(b"LPCoin"),
-    //          string::utf8(b"LPWETH"),
-    //     8, 
-    //     2,
-    //     6,
-    //    1,
-    //     80,
-    //     10,
-    //     13,
-    //     50,
-    //     10,
-    //     100,
-    //     80,
-    //     2,
-    //     1
-    //     );
-    // }
+    #[test(source = @0x0)]
+    public entry fun init_reserve_test(source : signer) {
+        MockCoin::initialize<MockCoin::WETH>(&source, 8);
+        init_reserve<MockCoin::WETH>(&source,string::utf8(
+            b"WETH Reserve"), 
+            string::utf8(b"LPCoin"), 
+            string::utf8(b"LPWETH"),
+            8, 2, 6, 1, 80, 10, 13, 50, 10, 100, 80, 2, 1
+        );
+    }
 
 
 }
