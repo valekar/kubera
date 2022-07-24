@@ -1,6 +1,6 @@
 // token holder address, not admin address
 
-module Kubera::MockCoin {
+module kubera::MockCoin {
     use aptos_framework::coin;
     use aptos_framework::type_info;
     use std::string::{Self};
@@ -79,7 +79,7 @@ module Kubera::MockCoin {
     }
 
 
-    #[test(admin=@Kubera, user=@0x1234567, core=@0xa550c18)]
+    #[test(admin=@kubera, user=@0x1234567, core=@0xa550c18)]
     public entry fun test_mint_script(admin: &signer, user: &signer) acquires TokenSharedCapability {
         initialize<WETH>(admin, 6);
         faucet_mint_to_script<WETH>(user, 1000000);

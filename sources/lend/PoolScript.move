@@ -1,8 +1,8 @@
-module Kubera::PoolScript {
+module kubera::PoolScript {
 
-    use Kubera::Pool;
+    use kubera::pool;
     use std::string::{String,Self};
-    use Kubera::MockCoin;
+    use kubera::MockCoin;
 
     public entry fun init_reserve<ReserveCoin>(
         admin : &signer , 
@@ -23,7 +23,7 @@ module Kubera::PoolScript {
         protocol_liquidation_fee: u8,
         protocol_take_rate: u8
         ) {
-        Pool::create_reserve<ReserveCoin>(
+        pool::create_reserve<ReserveCoin>(
             admin, 
             reserve_name, 
             reserve_collateral_name, 

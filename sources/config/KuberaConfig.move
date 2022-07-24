@@ -1,9 +1,9 @@
-module Kubera::kubera_config {
+module kubera::kubera_config {
 
     use std::signer;
 
     public fun admin_address() : address {
-        @Kubera
+        @kubera
     }
 
     struct LendingMarket has key ,store {

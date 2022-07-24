@@ -1,9 +1,9 @@
-module Kubera::Pool {
+module kubera::pool {
 
     use std::string::{String};
     use aptos_framework::coin;
     use std::signer;
-    use Kubera::kubera_config;
+    use kubera::kubera_config;
     //use aptos_framework::timestamp;
 
 
