@@ -66,10 +66,10 @@ module kubera::PoolScript {
 
          pool::add_reserve_lp_collateral_direct<MockCoin::WETH>(10);
 
-        // let (collateral_coin, reserve_coin) = pool::fetch_pool_balance<MockCoin::WETH>();
+        let (collateral_coin, reserve_coin) = pool::fetch_pool_balance<MockCoin::WETH>();
 
-        // assert!(collateral_coin == 10, 1); 
-        // assert!(reserve_coin == 0 , 1);
+        assert!(collateral_coin == 10, 1); 
+        assert!(reserve_coin == 0 , 1);
 
     }
 

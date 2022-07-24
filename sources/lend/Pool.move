@@ -101,7 +101,18 @@ module kubera::pool {
     //       block_timestamp_last :  timestamp::now_seconds()
     //    };
 
-       intialize_collateral_coin<LPCoin<ReserveCoin>>(sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals);
+     //  intialize_collateral_coin<LPCoin<ReserveCoin>>(sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals);
+
+        // INitialize store for LP Coin 
+       assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
+        let (mint_capability, burn_capability) = coin::initialize<LPCoin<ReserveCoin>>(
+            sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals, true
+        );
+        coin::register_internal<LPCoin<ReserveCoin>>(sender);
+        let lp_capability = LPCapability<ReserveCoin>{ mint_cap: mint_capability, burn_cap: burn_capability };
+        move_to<LPCapability<ReserveCoin>>(sender, lp_capability);
+        // initialize LPCOIN
+
        
         let liquidity = ReserveLiquidy<ReserveCoin> {
             liquidity_coin : coin::zero<ReserveCoin>()
@@ -139,17 +150,17 @@ module kubera::pool {
  
     }
     
-    
-    fun intialize_collateral_coin<CoinType>(sender : &signer, lp_coin_name : String , symbol : String, decimals : u64) {
-        assert!(!coin::is_coin_initialized<CoinType>(), ERROR_ALREADY_INITIALIZED);
-        let (mint_capability, burn_capability) = coin::initialize<LPCoin<CoinType>>(
-            sender, lp_coin_name, symbol, decimals, true
-        );
-        coin::register_internal<CoinType>(sender);
-        let lp_capability = LPCapability<CoinType>{ mint_cap: mint_capability, burn_cap: burn_capability };
-        move_to<LPCapability<CoinType>>(sender, lp_capability);
-    }
 
+    // fun intialize_collateral_coin<ReserveCoin>(sender : &signer, reserve_collateral_name : String , reserve_collateral_symbol : String, collateral_decimals : u64) {
+        
+    //     assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
+    //     let (mint_capability, burn_capability) = coin::initialize<LPCoin<ReserveCoin>>(
+    //         sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals, true
+    //     );
+    //     coin::register_internal<LPCoin<ReserveCoin>>(sender);
+    //     let lp_capability = LPCapability<ReserveCoin>{ mint_cap: mint_capability, burn_cap: burn_capability };
+    //     move_to<LPCapability<ReserveCoin>>(sender, lp_capability);         
+    // }
 
    public fun add_reserve_lp_collateral_direct<ReserveCoin> (amount : u64) : u64  acquires Reserve, LPCapability {
         let addr = kubera_config::admin_address();
