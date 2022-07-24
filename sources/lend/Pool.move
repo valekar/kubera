@@ -32,7 +32,7 @@ module kubera::pool {
     }
 
     struct ReserveCollateral<phantom ReserveCoin> has  store {
-       collateral_coin : coin::Coin<LPCoin<ReserveCoin>>  
+       collateral_coin : coin::Coin<LPCoin<ReserveCoin>>,
     }
 
     struct ReserveConfig has store {
@@ -108,7 +108,7 @@ module kubera::pool {
         };
 
         let collateral = ReserveCollateral<ReserveCoin> {
-            collateral_coin : coin::zero<LPCoin<ReserveCoin>>()
+            collateral_coin : coin::zero<LPCoin<ReserveCoin>>(),
         };
 
         let reserve = Reserve<ReserveCoin> {
@@ -146,29 +146,41 @@ module kubera::pool {
             sender, lp_coin_name, symbol, decimals, true
         );
         coin::register_internal<CoinType>(sender);
-        move_to(sender, LPCapability<CoinType>{ mint_cap: mint_capability, burn_cap: burn_capability });
+        let lp_capability = LPCapability<CoinType>{ mint_cap: mint_capability, burn_cap: burn_capability };
+        move_to<LPCapability<CoinType>>(sender, lp_capability);
     }
 
 
-   fun add_reserve_lp_collateral_direct<ReserveCoin> (x : coin::Coin<LPCoin<ReserveCoin>>) : u64  acquires Reserve {
-    let addr = kubera_config::admin_address();
-    assert!(!exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
-    let pool = borrow_global_mut<Reserve<ReserveCoin>>(kubera_config::admin_address());
-    let collateral_coin = &mut pool.collateral.collateral_coin;
-    coin::merge(collateral_coin, x);
-    
-    coin::value(collateral_coin)
+   public fun add_reserve_lp_collateral_direct<ReserveCoin> (amount : u64) : u64  acquires Reserve, LPCapability {
+        let addr = kubera_config::admin_address();
+        assert!(exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
+        let pool = borrow_global_mut<Reserve<ReserveCoin>>(kubera_config::admin_address());
+        
+        let collateral_coin = &mut pool.collateral.collateral_coin;
+
+        let minted = mint<ReserveCoin>(addr,amount);
+
+        coin::merge(collateral_coin, minted);
+        
+        coin::value(collateral_coin)
 
    }
 
-   public fun fetch_pool_balance<ReserveCoin>() : (u64, u64) acquires Reserve {
-    let pool = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
-    let collateral_coin = coin::value(&pool.collateral.collateral_coin);
-    let liquidity_coin = coin::value(&pool.liquidity.liquidity_coin);
+   fun mint<ReserveCoin>(addr: address, amount: u64): coin::Coin<LPCoin<ReserveCoin>> acquires LPCapability {
+        assert!(exists<LPCapability<ReserveCoin>>(addr),ERROR_RESORUCE_DOES_NOT_EXISTS);
+        let liquidity_cap = borrow_global<LPCapability<ReserveCoin>>(kubera_config::admin_address());
+        let mint_token = coin::mint<LPCoin<ReserveCoin>>(amount, &liquidity_cap.mint_cap);
+        mint_token
+    }
 
-    (collateral_coin, liquidity_coin)
+   public fun fetch_pool_balance<ReserveCoin>() : (u64, u64) acquires Reserve {
+        let addr = kubera_config::admin_address();
+        assert!(exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
+        let pool = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
+        let collateral_coin = coin::value(&pool.collateral.collateral_coin);
+        let liquidity_coin = coin::value(&pool.liquidity.liquidity_coin);
+        (collateral_coin, liquidity_coin)
    }
 
  
-
 }
