@@ -1,0 +1,5 @@
+module kubera::obligation {
+
+
+    
+}

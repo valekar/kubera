@@ -1,6 +1,6 @@
 // token holder address, not admin address
 
-module kubera::MockCoin {
+module kubera::mock_coin {
     use aptos_framework::coin;
     use aptos_framework::type_info;
     use std::string::{Self};

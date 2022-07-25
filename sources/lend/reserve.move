@@ -1,4 +1,4 @@
-module kubera::pool {
+module kubera::reserve {
 
     use std::string::{String};
     use aptos_framework::coin;

@@ -1,8 +1,8 @@
 module kubera::PoolScript {
 
-    use kubera::pool::{Self};
-    use std::string::{String,Self};
-    use kubera::MockCoin;
+    use kubera::reserve::{Self};
+    use std::string::{String};
+    
 
     //use std::debug;
 
@@ -26,7 +26,7 @@ module kubera::PoolScript {
         protocol_liquidation_fee: u8,
         protocol_take_rate: u8
         ) {
-        pool::create_reserve<ReserveCoin>(
+        reserve::create_reserve<ReserveCoin>(
             admin, 
             reserve_name, 
            reserve_collateral_name, 
@@ -49,10 +49,16 @@ module kubera::PoolScript {
 
     }
 
+    #[test_only]
+    use kubera::mock_coin;
+    #[test_only]    
+    use std::string::{Self};
+ 
+
     #[test(source = @kubera)]
     public entry fun init_reserve_test(source : signer) {
-        MockCoin::initialize<MockCoin::WETH>(&source, 8);
-        init_reserve<MockCoin::WETH>(
+        mock_coin::initialize<mock_coin::WETH>(&source, 8);
+        init_reserve<mock_coin::WETH>(
             &source,
             string::utf8(b"WETH Reserve"), 
             string::utf8(b"LPCoin"), 
@@ -62,14 +68,14 @@ module kubera::PoolScript {
 
         //debug::print_stack_trace();
 
-        let (collateral_coin, reserve_coin) = pool::fetch_pool_balance<MockCoin::WETH>();
+        let (collateral_coin, reserve_coin) = reserve::fetch_pool_balance<mock_coin::WETH>();
 
         assert!(collateral_coin == 0, 1); 
         assert!(reserve_coin == 0 , 1);
 
-         pool::add_reserve_lp_collateral_direct<MockCoin::WETH>(10);
+         reserve::add_reserve_lp_collateral_direct<mock_coin::WETH>(10);
 
-        let (collateral_coin, reserve_coin) = pool::fetch_pool_balance<MockCoin::WETH>();
+        let (collateral_coin, reserve_coin) = reserve::fetch_pool_balance<mock_coin::WETH>();
 
         assert!(collateral_coin == 10, 1); 
         assert!(reserve_coin == 0 , 1);
