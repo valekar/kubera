@@ -4,11 +4,10 @@ module kubera::reserve {
     use aptos_framework::coin;
     use std::signer;
     use kubera::kubera_config;
+    use kubera::base::LPCoin;
     //use aptos_framework::timestamp;
    // use aptos_framework::account;
 
-
-    struct LPCoin<phantom ReserveCoin> {}
 
     struct Reserve<phantom ReserveCoin> has key{
         name : String,

@@ -1,4 +1,4 @@
-module kubera::PoolScript {
+module kubera::reserve_script {
 
     use kubera::reserve::{Self};
     use std::string::{String};
