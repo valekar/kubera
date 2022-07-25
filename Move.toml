@@ -13,4 +13,5 @@ MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "a
 kubera="0x0"
 aptos_framework="0x1"
 std="0x1"
+dev_addr="0x01"
 #HippoSwap = "0xf70ac33c984f8b7bead655ad239d246f1c0e3ca55fe0b8bfc119aa529c4630e8"

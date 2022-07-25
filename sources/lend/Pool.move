@@ -5,6 +5,7 @@ module kubera::pool {
     use std::signer;
     use kubera::kubera_config;
     //use aptos_framework::timestamp;
+    use aptos_framework::account;
 
 
     struct LPCoin<phantom ReserveCoin> {}
@@ -14,7 +15,8 @@ module kubera::pool {
         //last_update : LastUpdate, 
         liquidity : ReserveLiquidy<ReserveCoin>,
         collateral : ReserveLP<ReserveCoin>,
-        config : ReserveConfig
+        config : ReserveConfig,
+        //reserve_address : address,
 
     }
 
@@ -176,7 +178,7 @@ module kubera::pool {
         
         let lp_coins = &mut pool.collateral.lp_coins;
 
-        let minted = mint<ReserveCoin>(addr,amount);
+        let minted = mint_lp<ReserveCoin>(addr,amount);
 
         coin::merge<LPCoin<ReserveCoin>>(lp_coins, minted);
         
@@ -184,7 +186,7 @@ module kubera::pool {
 
    }
 
-   fun mint<ReserveCoin>(addr: address, amount: u64): coin::Coin<LPCoin<ReserveCoin>> acquires LPCapability {
+   fun mint_lp<ReserveCoin>(addr: address, amount: u64): coin::Coin<LPCoin<ReserveCoin>> acquires LPCapability {
         assert!(exists<LPCapability<ReserveCoin>>(addr),ERROR_RESORUCE_DOES_NOT_EXISTS);
         let liquidity_cap = borrow_global<LPCapability<ReserveCoin>>(kubera_config::admin_address());
         let mint_token = coin::mint<LPCoin<ReserveCoin>>(amount, &liquidity_cap.mint_cap);
@@ -231,7 +233,7 @@ module kubera::pool {
         // if reserve lp balance is less, then mint the LPs and add them to reserve first;
         if (balance_reserve_lp_coins < lp_amount) {
             let lp_coins = &mut reserve.collateral.lp_coins;
-            let minted = mint<ReserveCoin>(admin_addr, lp_amount - balance_reserve_lp_coins );
+            let minted = mint_lp<ReserveCoin>(admin_addr, lp_amount - balance_reserve_lp_coins );
             coin::merge<LPCoin<ReserveCoin>>(lp_coins, minted);
         };
 
@@ -244,13 +246,11 @@ module kubera::pool {
     /// WARNING : need validation
     public fun withdraw_liquidity<ReserveCoin>(sender : &signer, lp_amount : u64) acquires Reserve {
         assert_reserve_exists<ReserveCoin>();
+        //user lp greater than zero
         assert_lp_greater_than_zero<ReserveCoin>(signer::address_of(sender));
 
 
         let admin_addr = kubera_config::admin_address();
-        assert_lp_greater_than_zero<ReserveCoin>(signer::address_of(sender));
-
-
         let balance_liquidity_coins = coin::balance<ReserveCoin>(admin_addr);
         assert!(balance_liquidity_coins > lp_amount, ERROR_INSUFFICIENT_BALANCE);
 
@@ -275,7 +275,7 @@ module kubera::pool {
 
     }
 
- 
+
     fun assert_reserve_exists<ReserveCoin>() {
         let addr = kubera_config::admin_address();
         assert!(exists<Reserve<ReserveCoin>>(addr), ERROR_RESORUCE_DOES_NOT_EXISTS);  

@@ -2,9 +2,16 @@ module kubera::kubera_config {
 
     use std::signer;
 
+    const KUBERA_ADDRESS:address = @0x01;
+
     public fun admin_address() : address {
         @kubera
     }
+
+    public fun kubera_address() : address {
+        KUBERA_ADDRESS
+    }
+
 
     struct LendingMarket has key ,store {
         version : u8,
