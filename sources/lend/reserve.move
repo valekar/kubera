@@ -288,6 +288,9 @@ module kubera::reserve {
 
 
     fun get_user_deposit_limit<ReserveCoin>(addr : address, requested_amount : u64): u64 acquires Reserve{
+        
+        assert!(exists<Reserve<ReserveCoin>>(kubera_config::admin_address()), ERROR_RESORUCE_DOES_NOT_EXISTS);
+
         let reserve = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
 
         let user_deposit_limit = reserve.config.user_deposit_limit;
@@ -308,6 +311,8 @@ module kubera::reserve {
     } 
 
     fun get_reserve_deposit_limit<ReserveCoin>(addr : address, requested_amount : u64): u64 acquires Reserve{
+                assert!(exists<Reserve<ReserveCoin>>(kubera_config::admin_address()), ERROR_RESORUCE_DOES_NOT_EXISTS);
+
         let reserve = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
 
         let deposit_limit = reserve.config.deposit_limit;

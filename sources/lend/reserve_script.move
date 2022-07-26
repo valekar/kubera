@@ -6,7 +6,7 @@ module kubera::reserve_script {
 
     //use std::debug;
 
-    public entry fun init_reserve<ReserveCoin>(
+    public entry fun init_reserve_script<ReserveCoin>(
         admin : &signer , 
         reserve_name : String, 
         reserve_collateral_name : String, 
@@ -58,7 +58,7 @@ module kubera::reserve_script {
     #[test(source = @kubera)]
     public entry fun init_reserve_test(source : signer) {
         mock_coin::initialize<mock_coin::WETH>(&source, 8);
-        init_reserve<mock_coin::WETH>(
+        init_reserve_script<mock_coin::WETH>(
             &source,
             string::utf8(b"WETH Reserve"), 
             string::utf8(b"LPCoin"), 
