@@ -11,12 +11,12 @@ module kubera::obligation_script {
 
     }
 
-    public entry fun init_obligation_store_script(admin : &signer) {
-        obligation::init_obligation_store(admin);
+    public entry fun init_obligation_store_script<ReserveCoin>(admin : &signer) {
+        obligation::init_obligation_store<ReserveCoin>(admin);
     }
 
-    public entry fun get_obligator_resource_script(sender_addr : address) : address {
-        obligation::get_obligator_resource(sender_addr)
+    public entry fun get_obligator_resource_script<ReserveCoin>(sender_addr : address) : address {
+        obligation::get_obligator_resource<ReserveCoin>(sender_addr)
     }
 
 
@@ -34,20 +34,22 @@ module kubera::obligation_script {
     use std::string;
     #[test_only]
     use kubera::reserve_script;
-    //#[test_only]
-    //use aptos_framework::coin;
+    #[test_only]
+    use aptos_framework::coin;
+
 
 
     #[test(admin = @kubera, end_user = @0x4 )]
     public fun test_obligation(admin:&signer, end_user : &signer) {
 
-        init_obligation_store_script(admin);
-
-        let version = 1;
         mock_coin::initialize<mock_coin::WETH>(admin, 8);
+
+        init_obligation_store_script<mock_coin::WETH>(admin);
+        
+        let version = 1;
         let resource_addr = init_obligation_script<mock_coin::WETH>(end_user, version);
 
-        let stored_addr = get_obligator_resource_script(signer::address_of(end_user));  
+        let stored_addr = get_obligator_resource_script<mock_coin::WETH>(signer::address_of(end_user));  
 
         assert!(stored_addr == resource_addr, 2);
         assert!(@0x1 != stored_addr, 1 );
@@ -57,21 +59,44 @@ module kubera::obligation_script {
     #[test(admin = @kubera, end_user = @0x4 )]
     #[expected_failure]
     public fun test_init_obligation_twice(admin:&signer, end_user : &signer) {
-        init_obligation_store_script(admin);
+        mock_coin::initialize<mock_coin::WETH>(admin, 8);
+        init_obligation_store_script<mock_coin::WETH>(admin);
 
         let version = 1;
-        mock_coin::initialize<mock_coin::WETH>(admin, 8);
         let _ = init_obligation_script<mock_coin::WETH>(end_user, version);
-
         init_obligation_script<mock_coin::WETH>(end_user, version);
     }
 
 
     #[test(admin = @kubera,end_user = @0x63)]
     public fun test_deposit(admin : &signer, end_user : &signer) {
-        // init reserce
-        mock_coin::initialize<mock_coin::WETH>(admin, 8);
+        // initiate the reserce (liquidity)
+        initiate_reserve(admin);
+    
+        // initiate the obligation
+        init_obligation_store_script<mock_coin::WETH>(admin);
+        let version = 1;
+        let _ = init_obligation_script<mock_coin::WETH>(end_user, version);
 
+        // mint some WETH coins to end user
+        mock_coin::faucet_mint_to_script<mock_coin::WETH>(end_user, 8);
+        let weth_balance = coin::balance<mock_coin::WETH>(signer::address_of(end_user));
+        assert!(weth_balance == 8, 2);
+
+        // Now deposit the WETH into obligation
+        deposit_script<mock_coin::WETH>(end_user, 2);
+
+        let (a, b,c) = obligation::get_obligation_deposit_collateral_balance<mock_coin::WETH>(end_user);
+
+        assert!(a == 2, 1);
+        assert!(b ==  2, 4);
+        assert!(c == 2 , 2);
+
+    }
+
+    #[test_only]
+    fun initiate_reserve(admin : &signer){
+        mock_coin::initialize<mock_coin::WETH>(admin, 8);
         reserve_script::init_reserve_script<mock_coin::WETH>(
             admin,
             string::utf8(b"WETH Reserve"), 
@@ -79,23 +104,5 @@ module kubera::obligation_script {
             string::utf8(b"LPWETH"),
             8, 2, 6, 1, 80, 10, 13, 50, 10, 100, 100,80, 2, 1
         );
-        
-        
-        init_obligation_store_script(admin);
-
-        let version = 1;
-        let _ = init_obligation_script<mock_coin::WETH>(end_user, version);
-
-        // let weth_balance = coin::balance<mock_coin::WETH>(signer::address_of(admin));
-
-        // assert!(weth_balance == 8, 2);
-
-        //let weth_coins = coin::withdraw<mock_coin::WETH>(admin, 2);
-
-        //coin::deposit<mock_coin::WETH>(signer::address_of(end_user), weth_coins);
-
-        mock_coin::faucet_mint_to_script<mock_coin::WETH>(end_user, 8);
-
-        deposit_script<mock_coin::WETH>(end_user, 2);
     }
 }

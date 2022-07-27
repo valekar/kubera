@@ -7,6 +7,7 @@ module kubera::reserve {
     use kubera::base::LPCoin;
     //use aptos_framework::timestamp;
    // use aptos_framework::account;
+   use std::debug;
 
 
     struct Reserve<phantom ReserveCoin> has key{
@@ -108,8 +109,6 @@ module kubera::reserve {
     //       block_timestamp_last :  timestamp::now_seconds()
     //    };
 
-     //  intialize_collateral_coin<LPCoin<ReserveCoin>>(sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals);
-
         // INitialize store for LP Coin 
        assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
         let (mint_capability, burn_capability) = coin::initialize<LPCoin<ReserveCoin>>(
@@ -158,7 +157,7 @@ module kubera::reserve {
  
     }
     
-
+    // This separate function did not work, had to move into the above function 
     // fun intialize_collateral_coin<ReserveCoin>(sender : &signer, reserve_collateral_name : String , reserve_collateral_symbol : String, collateral_decimals : u64) {
         
     //     assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
@@ -212,7 +211,6 @@ module kubera::reserve {
 
     }
    
-
     // WARNING : Need validation
     fun deposit_liquidity<ReserveCoin>(sender: &signer,liquidity_amount: u64, lp_amount : u64) acquires Reserve, LPCapability {
         assert_reserve_exists<ReserveCoin>();
@@ -236,9 +234,16 @@ module kubera::reserve {
             coin::merge<LPCoin<ReserveCoin>>(lp_coins, minted);
         };
 
-        // then extract the lps - this is done for the recording purpose 
+        // // then extract the lps - this is done for the recording purpose 
         let lp_coins = &mut reserve.collateral.lp_coins;
+        debug::print(lp_coins);
         let extracted_lp_coins = coin::extract<LPCoin<ReserveCoin>>(lp_coins, lp_amount);
+
+        let sender_addr = signer::address_of(sender);
+
+        if(!coin::is_account_registered<LPCoin<ReserveCoin>>(sender_addr)){
+            coin::register_internal<LPCoin<ReserveCoin>>(sender);
+        };
         coin::deposit<LPCoin<ReserveCoin>>(signer::address_of(sender), extracted_lp_coins);
 
    }
