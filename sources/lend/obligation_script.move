@@ -102,7 +102,7 @@ module kubera::obligation_script {
             string::utf8(b"WETH Reserve"), 
             string::utf8(b"LPCoin"), 
             string::utf8(b"LPWETH"),
-            8, 2, 6, 1, 80, 10, 13, 50, 10, 100, 100,80, 2, 1
+            8, 2, 6, 1, 80, 10, 13, 50, 10, 2 ,100, 100,80, 2, 1
         );
     }
 }

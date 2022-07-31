@@ -4,6 +4,20 @@ module kubera::kubera_config {
 
     const KUBERA_ADDRESS:address = @0x01;
 
+    const  EXCLUSIVE : u8  = 1;
+    const INCLUSIVE :u8 = 0;
+
+
+
+    public fun EXCLUSIVE_():u8 {
+        EXCLUSIVE
+    }
+
+    public fun INCLUSIVE_():u8 {
+        INCLUSIVE
+    }
+
+
     public fun admin_address() : address {
         @kubera
     }
@@ -26,5 +40,7 @@ module kubera::kubera_config {
 
         move_to<LendingMarket>(sender, lending_market);
     }
+
+
 
 }
