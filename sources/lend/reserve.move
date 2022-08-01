@@ -1,19 +1,22 @@
-module kubera::pool {
+module kubera::reserve {
 
     use std::string::{String};
     use aptos_framework::coin;
     use std::signer;
     use kubera::kubera_config;
+    use kubera::base::LPCoin;
     //use aptos_framework::timestamp;
    // use aptos_framework::account;
+   use std::debug;
+   use std::option::{Self};
+   use kubera::math;
 
 
-    struct LPCoin<phantom ReserveCoin> {}
 
     struct Reserve<phantom ReserveCoin> has key{
         name : String,
         //last_update : LastUpdate, 
-        liquidity : ReserveLiquidy<ReserveCoin>,
+        liquidity : ReserveLiquidity<ReserveCoin>,
         collateral : ReserveLP<ReserveCoin>,
         config : ReserveConfig,
         //reserve_address : address,
@@ -29,8 +32,21 @@ module kubera::pool {
         block_timestamp_last : u64,
     }
 
-    struct ReserveLiquidy<phantom ReserveCoin> has store {
-     liquidity_coin : coin::Coin<ReserveCoin>
+    struct ReserveLiquidity<phantom ReserveCoin> has store {
+        liquidity_coin : coin::Coin<ReserveCoin>,
+        //supply_address : address,  - this would be address from where reserve mint arises
+        /// Reserve liquidity available
+        available_amount : u64,
+        /// Reserve liquidity borrowed //decimals
+        borrowed_amount_wads: u64,
+        /// Reserve liquidity cumulative borrow rate //decimals
+        cumulative_borrow_rate_wads: u64,
+        /// Reserve cumulative protocol fees //decimals
+        accumulated_protocol_fees_wads: u64,
+        /// Reserve liquidity market price in quote currency //decimals
+        market_price: u64,
+        //decimals
+        decimals : u64
     }
 
     struct ReserveLP<phantom ReserveCoin> has  store {
@@ -69,7 +85,9 @@ module kubera::pool {
 
 
     struct ReserveFees has key, store {
-        borrow_fees : u64
+        borrow_fee_wad : u64,
+        /// Amount of fee going to host account, if provided in liquidate and repay
+        host_fee_percentage: u8,
     }
 
 
@@ -78,6 +96,7 @@ module kubera::pool {
 
     const ERROR_DEPOSIT_LIMIT_REACHED:u64 = 2001;
     const ERROR_INSUFFICIENT_BALANCE:u64 = 2002;
+    const ERROR_BORROW_AMOUNT_IS_TOO_SMALL:u64 = 2003;
 
 
 
@@ -86,7 +105,7 @@ module kubera::pool {
         reserve_name : String, 
         reserve_collateral_name : String, 
         reserve_collateral_symbol : String,
-        collateral_decimals : u64, 
+        reserve_collateral_decimals : u64, 
         optimal_utilization_rate : u8,
         loan_to_value_ratio : u8,
         liquidation_bonus : u8,
@@ -95,6 +114,7 @@ module kubera::pool {
         optimal_borrow_rate: u8,
         max_borrow_rate: u8,
         fees : u64,
+        host_fee_percentage : u8,
         deposit_limit: u64,
         user_deposit_limit : u64,
         borrow_limit: u64,
@@ -109,12 +129,10 @@ module kubera::pool {
     //       block_timestamp_last :  timestamp::now_seconds()
     //    };
 
-     //  intialize_collateral_coin<LPCoin<ReserveCoin>>(sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals);
-
         // INitialize store for LP Coin 
        assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
         let (mint_capability, burn_capability) = coin::initialize<LPCoin<ReserveCoin>>(
-            sender, reserve_collateral_name, reserve_collateral_symbol, collateral_decimals, true
+            sender, reserve_collateral_name, reserve_collateral_symbol, reserve_collateral_decimals, true
         );
         coin::register_internal<LPCoin<ReserveCoin>>(sender);
         let lp_capability = LPCapability<ReserveCoin>{ mint_cap: mint_capability, burn_cap: burn_capability };
@@ -122,8 +140,15 @@ module kubera::pool {
         // initialize LPCOIN
 
        
-        let liquidity = ReserveLiquidy<ReserveCoin> {
-            liquidity_coin : coin::zero<ReserveCoin>()
+        let liquidity = ReserveLiquidity<ReserveCoin> {
+            liquidity_coin : coin::zero<ReserveCoin>(),
+            available_amount : 0,
+            borrowed_amount_wads: 0,
+            cumulative_borrow_rate_wads: math::get_WAD(),
+            accumulated_protocol_fees_wads: 0,
+            market_price: 0,
+            decimals : 0
+
         };
 
         let collateral = ReserveLP<ReserveCoin> {
@@ -144,7 +169,8 @@ module kubera::pool {
                     optimal_borrow_rate: optimal_borrow_rate,
                     max_borrow_rate: max_borrow_rate,
                     fees : ReserveFees {
-                        borrow_fees : fees
+                        borrow_fee_wad : fees,
+                        host_fee_percentage : host_fee_percentage 
                     },
                     deposit_limit: deposit_limit,
                     user_deposit_limit : user_deposit_limit,
@@ -159,7 +185,7 @@ module kubera::pool {
  
     }
     
-
+    // This separate function did not work, had to move into the above function 
     // fun intialize_collateral_coin<ReserveCoin>(sender : &signer, reserve_collateral_name : String , reserve_collateral_symbol : String, collateral_decimals : u64) {
         
     //     assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
@@ -213,7 +239,6 @@ module kubera::pool {
 
     }
    
-
     // WARNING : Need validation
     fun deposit_liquidity<ReserveCoin>(sender: &signer,liquidity_amount: u64, lp_amount : u64) acquires Reserve, LPCapability {
         assert_reserve_exists<ReserveCoin>();
@@ -237,9 +262,16 @@ module kubera::pool {
             coin::merge<LPCoin<ReserveCoin>>(lp_coins, minted);
         };
 
-        // then extract the lps - this is done for the recording purpose 
+        // // then extract the lps - this is done for the recording purpose 
         let lp_coins = &mut reserve.collateral.lp_coins;
+        debug::print(lp_coins);
         let extracted_lp_coins = coin::extract<LPCoin<ReserveCoin>>(lp_coins, lp_amount);
+
+        let sender_addr = signer::address_of(sender);
+
+        if(!coin::is_account_registered<LPCoin<ReserveCoin>>(sender_addr)){
+            coin::register_internal<LPCoin<ReserveCoin>>(sender);
+        };
         coin::deposit<LPCoin<ReserveCoin>>(signer::address_of(sender), extracted_lp_coins);
 
    }
@@ -289,6 +321,9 @@ module kubera::pool {
 
 
     fun get_user_deposit_limit<ReserveCoin>(addr : address, requested_amount : u64): u64 acquires Reserve{
+        
+        assert!(exists<Reserve<ReserveCoin>>(kubera_config::admin_address()), ERROR_RESORUCE_DOES_NOT_EXISTS);
+
         let reserve = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
 
         let user_deposit_limit = reserve.config.user_deposit_limit;
@@ -309,6 +344,8 @@ module kubera::pool {
     } 
 
     fun get_reserve_deposit_limit<ReserveCoin>(addr : address, requested_amount : u64): u64 acquires Reserve{
+                assert!(exists<Reserve<ReserveCoin>>(kubera_config::admin_address()), ERROR_RESORUCE_DOES_NOT_EXISTS);
+
         let reserve = borrow_global<Reserve<ReserveCoin>>(kubera_config::admin_address());
 
         let deposit_limit = reserve.config.deposit_limit;
@@ -328,5 +365,145 @@ module kubera::pool {
     } 
 
 
+    public fun get_total_suppy<ReserveCoin>(): u128 {
+        assert!(coin::is_coin_initialized<ReserveCoin>(), ERROR_RESORUCE_DOES_NOT_EXISTS);
+        option::get_with_default(&coin::supply<ReserveCoin>(),0)  
+    }
+
+    public fun exchange_rate<ReserveCoin>(total_liquidity : u128 ) : u128 {
+        let total_supply = get_total_suppy<ReserveCoin>();
+
+        let rate = if ( total_supply== 0 || total_liquidity == 0) {
+            math::get_INITIAL_COLLATERAL_RATE()
+        } else {
+            total_supply/total_liquidity
+        };
+
+        rate
+    }
+
+    public fun collateral_to_liquidity(collateral_amount : u64, liquidity_amount : u64) : u64 {
+        collateral_amount/liquidity_amount
+    }   
+
+    public fun liquidity_to_collateral(liquidity_amount: u64, collateral_amount:u64) : u64 {
+        liquidity_amount * collateral_amount
+    }
+
+
+    // liquidity interest
+    fun compound_interest<ReserveCoin>(current_borrow_rate : u64, blocks_elasped : u64, take_rate : u64)  acquires Reserve{
+
+        let admin_addr = kubera_config::admin_address();
+
+        assert!(exists<Reserve<ReserveCoin>>(admin_addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
+
+        let reserve = borrow_global_mut<Reserve<ReserveCoin>>(admin_addr);
+
+        let reserve_liquidity = &mut reserve.liquidity;
+
+        let cumulative_borrow_rate_wads = &mut reserve_liquidity.cumulative_borrow_rate_wads;
+
+        let interest_rate = current_borrow_rate/(math::get_SLOTS_PER_YEAR());
+
+        let compound_interest_rate =   (math::pow(((math::get_WAD() + interest_rate) as u128) , (blocks_elasped as u8)) as u64);
+
+
+        *cumulative_borrow_rate_wads = *cumulative_borrow_rate_wads * (compound_interest_rate as u64);
+
+
+        let borrowed_amount_wads = &mut reserve_liquidity.borrowed_amount_wads;
+
+        let net_new_debt = *borrowed_amount_wads * compound_interest_rate - *borrowed_amount_wads;
+
+
+        *borrowed_amount_wads = *borrowed_amount_wads + net_new_debt;
+
+        let accumulated_protocol_fees_wads = &mut reserve_liquidity.accumulated_protocol_fees_wads;
+
+        *accumulated_protocol_fees_wads = net_new_debt * take_rate +  *accumulated_protocol_fees_wads;
+
+
+    } 
+
+    //  /// Calculate the owner and host fees on borrow
+    public fun calculate_borrow_fees<ReserveCoin>(
+        borrow_amount: u128,
+        fee_calculation: u8,
+    ) : (u128, u128) acquires Reserve{
+
+        let admin_addr = kubera_config::admin_address();
+
+        assert!(exists<Reserve<ReserveCoin>>(admin_addr), ERROR_RESORUCE_DOES_NOT_EXISTS);
+
+        let reserve = borrow_global<Reserve<ReserveCoin>>(admin_addr);
+
+        let reserve_config = &reserve.config;
+
+        let borrow_fee_wad = &reserve_config.fees.borrow_fee_wad;
+
+        let host_fee_percentage = &reserve_config.fees.host_fee_percentage;
+
+
+        calculate_fees(borrow_amount, *borrow_fee_wad , fee_calculation, *host_fee_percentage)
+    }
+
+
+    //reserve config 
+
+   // public fun calculate_borrow_fees(borrow_amount : u128)
+
+   fun calculate_fees(amount : u128, fee_wad : u64, fee_calculation : u8, host_fee_percentage : u8 ): (u128, u128) {
+        let borrow_fee_rate = fee_wad;
+        let host_fee_rate = host_fee_percentage; 
+
+        if(borrow_fee_rate > 0 && amount > 0) {
+            let need_to_assess_host_fee = host_fee_rate > 0;
+            let minimum_fee = if(need_to_assess_host_fee) {
+                2u64 // 1 token to owner, 1 to host
+            } else {
+                1u64 // 1 token to owner, nothing else
+            };
+
+            let borrow_fee_amount  = if( fee_calculation == kubera_config::EXCLUSIVE_()){
+                // Calculate fee to be added to borrow: fee = amount * rate
+                amount * (borrow_fee_rate as u128)
+                
+            }
+            else if( fee_calculation == kubera_config::INCLUSIVE_()){
+                // Calculate fee to be subtracted from borrow: fee = amount * (rate / (rate + 1))
+                let borrow_fee_rate = borrow_fee_rate / (borrow_fee_rate + math::get_WAD());
+                amount *  (borrow_fee_rate as u128)
+               
+            } else {
+                0
+            };
+
+            assert!(borrow_fee_amount > 0 , ERROR_BORROW_AMOUNT_IS_TOO_SMALL);
+        
+
+            let borrow_fee_decimal =  math::max(borrow_fee_amount,(minimum_fee as u128)); 
+            
+            assert!(borrow_fee_decimal < amount, ERROR_BORROW_AMOUNT_IS_TOO_SMALL);
+            
+
+            let borrow_fee = borrow_fee_decimal;
+            let host_fee = if(need_to_assess_host_fee) {
+                math::max(borrow_fee_decimal * (host_fee_rate as u128) , 1u128)
+                    
+            } else {
+                0
+            };
+
+            (borrow_fee, host_fee)
+        } else {
+            (0, 0)
+        }
+
+
+   }
+
+
+ 
 
 }

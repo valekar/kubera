@@ -10,7 +10,7 @@ MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "a
 
 
 [addresses]
-kubera="0x0"
+kubera="0x1"
 aptos_framework="0x1"
 std="0x1"
 dev_addr="0x01"
