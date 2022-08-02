@@ -70,14 +70,14 @@ module kubera::reserve_script {
 
         //debug::print_stack_trace();
 
-        let (collateral_coin, reserve_coin) = reserve::fetch_pool_balance<mock_coin::WETH>();
+        let (collateral_coin, reserve_coin) = reserve::fetch_liquidity_balance<mock_coin::WETH>();
 
         assert!(collateral_coin == 0, 1); 
         assert!(reserve_coin == 0 , 1);
 
          reserve::add_reserve_lp_collateral_direct<mock_coin::WETH>(10);
 
-        let (collateral_coin, reserve_coin) = reserve::fetch_pool_balance<mock_coin::WETH>();
+        let (collateral_coin, reserve_coin) = reserve::fetch_liquidity_balance<mock_coin::WETH>();
 
         assert!(collateral_coin == 10, 1); 
         assert!(reserve_coin == 0 , 1);
