@@ -627,7 +627,7 @@ module kubera::reserve {
     }
 
 
-/// Calculate the current borrow rate
+    /// Calculate the current borrow rate
     public fun current_borrow_rate<ReserveCoin>() : u128 acquires Reserve{
 
         assert_reserve_exists<ReserveCoin>();
