@@ -72,8 +72,14 @@ module kubera::math {
     }
 
 
-     public fun max(a: u128, b: u128): u128 {
+    public fun max(a: u128, b: u128): u128 {
         if (a < b) b else a
     }
+
+    public fun min(a: u64, b: u64): u64 {
+        if (a > b) b else a
+    }
+
+ 
 
 }

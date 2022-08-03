@@ -2,8 +2,7 @@ module kubera::reserve_script {
 
     use kubera::reserve::{Self};
     use std::string::{String};
-    
-
+    use kubera::base;
     //use std::debug;
 
     public entry fun init_reserve_script<ReserveCoin>(
@@ -59,6 +58,7 @@ module kubera::reserve_script {
 
     #[test(source = @kubera)]
     public entry fun init_reserve_test(source : signer) {
+        base::setup_timestamp(&source);
         mock_coin::initialize<mock_coin::WETH>(&source, 8);
         init_reserve_script<mock_coin::WETH>(
             &source,
@@ -70,19 +70,18 @@ module kubera::reserve_script {
 
         //debug::print_stack_trace();
 
-        let (collateral_coin, reserve_coin) = reserve::fetch_pool_balance<mock_coin::WETH>();
+        let (collateral_coin, reserve_coin) = reserve::fetch_liquidity_balance<mock_coin::WETH>();
 
         assert!(collateral_coin == 0, 1); 
         assert!(reserve_coin == 0 , 1);
 
          reserve::add_reserve_lp_collateral_direct<mock_coin::WETH>(10);
 
-        let (collateral_coin, reserve_coin) = reserve::fetch_pool_balance<mock_coin::WETH>();
+        let (collateral_coin, reserve_coin) = reserve::fetch_liquidity_balance<mock_coin::WETH>();
 
         assert!(collateral_coin == 10, 1); 
         assert!(reserve_coin == 0 , 1);
 
     }
-
 
 }
