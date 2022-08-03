@@ -2,6 +2,7 @@ module kubera::obligation_script {
 
     use kubera::obligation;
     use std::debug;
+    use kubera::base;
 
 
     public entry fun init_obligation_script<ReserveCoin>(sender : &signer, version : u8) : address {
@@ -59,6 +60,8 @@ module kubera::obligation_script {
     #[test(admin = @kubera, end_user = @0x4 )]
     #[expected_failure]
     public fun test_init_obligation_twice(admin:&signer, end_user : &signer) {
+        base::setup_timestamp(admin);
+
         mock_coin::initialize<mock_coin::WETH>(admin, 8);
         init_obligation_store_script<mock_coin::WETH>(admin);
 
@@ -70,6 +73,9 @@ module kubera::obligation_script {
 
     #[test(admin = @kubera,end_user = @0x63)]
     public fun test_deposit(admin : &signer, end_user : &signer) {
+        
+        base::setup_timestamp(admin);
+        
         // initiate the reserce (liquidity)
         initiate_reserve(admin);
     

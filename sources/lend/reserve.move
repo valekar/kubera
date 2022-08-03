@@ -5,7 +5,7 @@ module kubera::reserve {
     use std::signer;
     use kubera::kubera_config;
     use kubera::base::LPCoin;
-    //use aptos_framework::timestamp;
+    use aptos_framework::timestamp;
    // use aptos_framework::account;
    use std::debug;
    //use std::option::{Self};
@@ -15,7 +15,7 @@ module kubera::reserve {
 
     struct Reserve<phantom ReserveCoin> has key{
         name : String,
-        //last_update : LastUpdate, 
+        last_update : LastUpdate, 
         liquidity : ReserveLiquidity<ReserveCoin>,
         collateral : ReserveLP<ReserveCoin>,
         config : ReserveConfig,
@@ -126,9 +126,9 @@ module kubera::reserve {
 
         assert!(!exists<Reserve<ReserveCoin>>(addr), ERROR_ALREADY_INITIALIZED);
 
-    //    let last_update = LastUpdate {
-    //       block_timestamp_last :  timestamp::now_seconds()
-    //    };
+       let last_update = LastUpdate {
+          block_timestamp_last :  timestamp::now_seconds()
+       };
 
         // INitialize store for LP Coin 
        assert!(!coin::is_coin_initialized<LPCoin<ReserveCoin>>(), ERROR_ALREADY_INITIALIZED);
@@ -158,7 +158,7 @@ module kubera::reserve {
 
         let reserve = Reserve<ReserveCoin> {
             name : reserve_name,
-            //last_update : last_update,
+            last_update : last_update,
             liquidity : liquidity,
             collateral : collateral,
             config : ReserveConfig {
@@ -695,24 +695,26 @@ module kubera::reserve {
                 let rate_range = math::from_percent(max_borrow_rate - optimal_borrow_rate);
 
                 (normalized_rate * rate_range)+ min_rate
-            }
-            
-            
+            }          
         }
     }
 
+    /// Update borrow rate and accrue interest
+    public fun accrue_interest<ReserveCoin>(current_timestamp: u64) acquires Reserve{        
+        assert_reserve_exists<ReserveCoin>();
+        let admin_addr = kubera_config::admin_address();
 
-    //     /// Update borrow rate and accrue interest
-    // public fun accrue_interest(current_slot: u64) {
-    //     let slots_elapsed = self.last_update.slots_elapsed(current_slot)?;
-    //     if slots_elapsed > 0 {
-    //         let current_borrow_rate = self.current_borrow_rate()?;
-    //         let take_rate = Rate::from_percent(self.config.protocol_take_rate);
-    //         self.liquidity
-    //             .compound_interest(current_borrow_rate, slots_elapsed, take_rate)?;
-    //     }
-        
-    // }
+        let reserve = borrow_global<Reserve<ReserveCoin>>(admin_addr);
+
+        let last_update = reserve.last_update.block_timestamp_last;
+
+        let time_elapsed = current_timestamp - last_update;
+        if(time_elapsed > 0) {
+            let take_rate = math::from_percent(reserve.config.protocol_take_rate);
+            let current_borrow_rate  = current_borrow_rate<ReserveCoin>() ;
+            compound_interest<ReserveCoin>((current_borrow_rate as u64), (time_elapsed as u64), (take_rate as u64));
+        }   
+    }
  
 
 }

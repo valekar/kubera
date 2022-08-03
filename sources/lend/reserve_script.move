@@ -2,8 +2,7 @@ module kubera::reserve_script {
 
     use kubera::reserve::{Self};
     use std::string::{String};
-    
-
+    use kubera::base;
     //use std::debug;
 
     public entry fun init_reserve_script<ReserveCoin>(
@@ -59,6 +58,7 @@ module kubera::reserve_script {
 
     #[test(source = @kubera)]
     public entry fun init_reserve_test(source : signer) {
+        base::setup_timestamp(&source);
         mock_coin::initialize<mock_coin::WETH>(&source, 8);
         init_reserve_script<mock_coin::WETH>(
             &source,
@@ -83,6 +83,5 @@ module kubera::reserve_script {
         assert!(reserve_coin == 0 , 1);
 
     }
-
 
 }
