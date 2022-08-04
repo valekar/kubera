@@ -1,13 +1,12 @@
 module kubera::obligation_script {
 
     use kubera::obligation;
-    use std::debug;
-    use kubera::base;
+    //use std::debug;
 
 
     public entry fun init_obligation_script<ReserveCoin>(sender : &signer, version : u8) : address {
        let resource_addr = obligation::init_new_obligation<ReserveCoin>(sender, version);
-        debug::print(&resource_addr);
+        //debug::print(&resource_addr);
         resource_addr
 
     }
@@ -37,6 +36,8 @@ module kubera::obligation_script {
     use kubera::reserve_script;
     #[test_only]
     use aptos_framework::coin;
+    #[test_only]
+    use kubera::base;
 
 
 

@@ -2,7 +2,7 @@ module kubera::reserve_script {
 
     use kubera::reserve::{Self};
     use std::string::{String};
-    use kubera::base;
+    
     //use std::debug;
 
     public entry fun init_reserve_script<ReserveCoin>(
@@ -54,19 +54,18 @@ module kubera::reserve_script {
     use kubera::mock_coin;
     #[test_only]    
     use std::string::{Self};
- 
+    #[test_only]
+    use kubera::base;
+    #[test_only]
+    use std::debug;
+     #[test_only]
+    use aptos_framework::coin;
+    // #[test_only]
+    // use aptos_framework::signer;
 
     #[test(source = @kubera)]
-    public entry fun init_reserve_test(source : signer) {
-        base::setup_timestamp(&source);
-        mock_coin::initialize<mock_coin::WETH>(&source, 8);
-        init_reserve_script<mock_coin::WETH>(
-            &source,
-            string::utf8(b"WETH Reserve"), 
-            string::utf8(b"LPCoin"), 
-            string::utf8(b"LPWETH"),
-            8, 2, 6, 1, 80, 10, 13, 50, 10, 2,100, 100,80, 2, 1
-        );
+    public entry fun init_reserve_test(source : &signer) {
+        init_reserve(source);
 
         //debug::print_stack_trace();
 
@@ -82,6 +81,44 @@ module kubera::reserve_script {
         assert!(collateral_coin == 10, 1); 
         assert!(reserve_coin == 0 , 1);
 
+    }
+
+    
+    #[test(source = @kubera, end_user =  @0x123)]
+    public entry fun get_total_liquidity_suppy_test(source : &signer, end_user : &signer) {
+        init_reserve(source);
+
+       // let addr = signer::address_of(source);
+
+        let supply = reserve::get_total_liquidity_suppy<mock_coin::WETH>();
+        //debug::print(&supply);
+        assert!(supply == 0, 1);
+
+
+
+        // mint some WETH coins to end user
+        mock_coin::faucet_mint_to_script<mock_coin::WETH>(end_user, 8);
+        reserve::deposit_liquidity_direct<mock_coin::WETH>(end_user, 5);
+
+        let supply = reserve::get_total_liquidity_suppy<mock_coin::WETH>();
+        debug::print( &supply);
+        assert!(supply == 5, 1);
+
+    }
+
+    #[test_only]
+    fun init_reserve(source : &signer) {
+
+        base::setup_timestamp(source);
+        mock_coin::initialize<mock_coin::WETH>(source, 50);
+        coin::register_for_test<mock_coin::WETH>(source);
+        init_reserve_script<mock_coin::WETH>(
+            source,
+            string::utf8(b"WETH Reserve"), 
+            string::utf8(b"LPCoin"), 
+            string::utf8(b"LPWETH"),
+            8, 2, 6, 1, 80, 10, 13, 50, 10, 2,100, 100,80, 2, 1
+        );
     }
 
 }

@@ -2,6 +2,7 @@ module kubera::reserve {
 
     use std::string::{String};
     use aptos_framework::coin;
+    use aptos_framework::coins;
     use std::signer;
     use kubera::kubera_config;
     use kubera::base::LPCoin;
@@ -135,7 +136,7 @@ module kubera::reserve {
         let (mint_capability, burn_capability) = coin::initialize<LPCoin<ReserveCoin>>(
             sender, reserve_collateral_name, reserve_collateral_symbol, reserve_collateral_decimals, true
         );
-        coin::register_internal<LPCoin<ReserveCoin>>(sender);
+        coins::register<LPCoin<ReserveCoin>>(sender);
         let lp_capability = LPCapability<ReserveCoin>{ mint_cap: mint_capability, burn_cap: burn_capability };
         move_to<LPCapability<ReserveCoin>>(sender, lp_capability);
         // initialize LPCOIN
@@ -249,7 +250,7 @@ module kubera::reserve {
         // then get reserve deposit limit
         let mintable_lp_coins_limit = get_reserve_deposit_limit<ReserveCoin>(signer::address_of(sender), allowed_lp_coins);
 
-        deposit_liquidity<ReserveCoin>(sender, mintable_lp_coins_limit);
+         deposit_liquidity<ReserveCoin>(sender, mintable_lp_coins_limit);
 
     }
    
@@ -284,7 +285,7 @@ module kubera::reserve {
         let sender_addr = signer::address_of(sender);
 
         if(!coin::is_account_registered<LPCoin<ReserveCoin>>(sender_addr)){
-            coin::register_internal<LPCoin<ReserveCoin>>(sender);
+            coins::register<LPCoin<ReserveCoin>>(sender);
         };
         coin::deposit<LPCoin<ReserveCoin>>(signer::address_of(sender), extracted_lp_coins);
 
@@ -320,6 +321,21 @@ module kubera::reserve {
         coin::deposit<ReserveCoin>(signer::address_of(sender), extracted_liquidity_coins);
 
     }
+
+    // public fun deposit_to_admin_wallet<ReserveCoin>(sender : &signer, amount : u64) acquires Reserve{
+    //     let admin = kubera_config::admin_address();
+
+    //     assert!(signer::address_of(sender) == admin, ERROR_UNAUTHORIZED);
+
+    //     let reserve = borrow_global_mut<Reserve<ReserveCoin>>(admin);
+
+    //     let liquidity = &mut reserve.liquidity;
+
+    //     let reserve_coins = coin::extract<ReserveCoin>(&mut liquidity.liquidity_coin, amount);
+
+    //     coin::deposit<ReserveCoin>(admin, reserve_coins);
+
+    // }
 
 
     fun assert_reserve_exists<ReserveCoin>() {
@@ -379,14 +395,18 @@ module kubera::reserve {
     } 
 
 
-    public fun get_total_liquidity_suppy<ReserveCoin>(): u128 {
+    public fun get_total_liquidity_suppy<ReserveCoin>(): u128 acquires Reserve{
         assert!(coin::is_coin_initialized<ReserveCoin>(), ERROR_RESORUCE_DOES_NOT_EXISTS);
 
         let admin_addr = kubera_config::admin_address();
 
-        let reserve_coin_balance = coin::balance<ReserveCoin>(admin_addr);
+        let reserve = borrow_global<Reserve<ReserveCoin>>(admin_addr);
+        let liquidity = &reserve.liquidity;
+        let reserve_coin = &liquidity.liquidity_coin;
 
-        (reserve_coin_balance as u128) 
+        let balance = coin::value<ReserveCoin>(reserve_coin);
+
+        (balance as u128) 
     }
 
     public fun total_supply<ReserveCoin>() : u64 acquires Reserve{
@@ -405,7 +425,7 @@ module kubera::reserve {
         available_amount+ borrowed_amount_wads - accumulated_protocol_fees_wads
     }
 
-    public fun exchange_rate<ReserveCoin>(total_liquidity : u128 ) : u128 {
+    public fun exchange_rate<ReserveCoin>(total_liquidity : u128 ) : u128 acquires Reserve{
         let total_supply = get_total_liquidity_suppy<ReserveCoin>();
 
         let rate = if ( total_supply== 0 || total_liquidity == 0) {
@@ -417,7 +437,7 @@ module kubera::reserve {
         rate
     }
 
-
+    
     public fun collateral_exchange_rate<ReserveCoin>():u128 acquires Reserve{
         let total_liquidity  = (total_supply<ReserveCoin>() as u128);
         exchange_rate<ReserveCoin>(total_liquidity)
@@ -715,6 +735,58 @@ module kubera::reserve {
             compound_interest<ReserveCoin>((current_borrow_rate as u64), (time_elapsed as u64), (take_rate as u64));
         }   
     }
+
+
+
+    /// Repay liquidity up to the borrowed amount
+    public fun calculate_repay(
+        amount_to_repay: u64,
+        borrowed_amount: u128,
+    ):u128 {
+        let settle_amount = if(amount_to_repay == math::u64_MAX()) {
+            borrowed_amount
+        } else {
+             math::min_128((amount_to_repay as u128), borrowed_amount)
+        };
+        
+        settle_amount                
+    }
+
+
+        /// Calculate protocol cut of liquidation bonus always at least 1 lamport
+    public fun calculate_protocol_liquidation_fee<ReserveCoin>(amount_liquidated: u64,):u64 acquires Reserve {
+
+        assert_reserve_exists<ReserveCoin>();
+        let admin_addr = kubera_config::admin_address();
+        let reserve = borrow_global<Reserve<ReserveCoin>>(admin_addr);
+
+        let liquidation_bonus = reserve.config.liquidation_bonus;
+        let protocol_liquidation_fee = reserve.config.protocol_liquidation_fee;
+
+        let bonus_rate = math::from_percent(liquidation_bonus) + (math::get_WAD() as u128);
+        let amount_liquidated_wads = (amount_liquidated as u128);
+
+        let bonus = amount_liquidated_wads  - ((amount_liquidated_wads as u128)/ bonus_rate);
+
+        // After deploying must update all reserves to set liquidation fee then redeploy with this line instead of hardcode
+         let protocol_fee = math::max(bonus * (math::from_percent(protocol_liquidation_fee)), 1);
+        //let protocol_fee = math::max(bonus * math::from_percent(0), 1);
+        (protocol_fee as u64)
+    }
+
+
+     /// Calculate protocol fee redemption accounting for availible liquidity and accumulated fees
+    public  fun calculate_redeem_fees<ReserveCoin>():u64  acquires Reserve{
+        assert_reserve_exists<ReserveCoin>();
+        let admin_addr = kubera_config::admin_address();
+        let reserve = borrow_global<Reserve<ReserveCoin>>(admin_addr);
+
+        let available_amount = reserve.liquidity.available_amount;
+        let accumulated_protocol_fees_wads = reserve.liquidity.accumulated_protocol_fees_wads;
+        
+        math::min(available_amount,accumulated_protocol_fees_wads)
+    }
  
+    
 
 }
