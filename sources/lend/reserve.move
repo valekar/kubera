@@ -2,6 +2,7 @@ module kubera::reserve {
 
     use std::string::{String};
     use aptos_framework::coin;
+    use aptos_framework::coins;
     use std::signer;
     use kubera::kubera_config;
     use kubera::base::LPCoin;
@@ -135,7 +136,7 @@ module kubera::reserve {
         let (mint_capability, burn_capability) = coin::initialize<LPCoin<ReserveCoin>>(
             sender, reserve_collateral_name, reserve_collateral_symbol, reserve_collateral_decimals, true
         );
-        coin::register_internal<LPCoin<ReserveCoin>>(sender);
+        coins::register<LPCoin<ReserveCoin>>(sender);
         let lp_capability = LPCapability<ReserveCoin>{ mint_cap: mint_capability, burn_cap: burn_capability };
         move_to<LPCapability<ReserveCoin>>(sender, lp_capability);
         // initialize LPCOIN
@@ -284,7 +285,7 @@ module kubera::reserve {
         let sender_addr = signer::address_of(sender);
 
         if(!coin::is_account_registered<LPCoin<ReserveCoin>>(sender_addr)){
-            coin::register_internal<LPCoin<ReserveCoin>>(sender);
+            coins::register<LPCoin<ReserveCoin>>(sender);
         };
         coin::deposit<LPCoin<ReserveCoin>>(signer::address_of(sender), extracted_lp_coins);
 

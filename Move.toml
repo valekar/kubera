@@ -4,9 +4,9 @@ version = "0.0.0"
 
 [dependencies]
 #AptosFramework = { local = "./aptos-core/aptos-move/framework/aptos-framework/" }
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "1a53e3a394731f9b636a2fd51c98dccf8fed6630" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "devnet" }
 #MoveNursery = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/move-stdlib/nursery/", rev = "b15d56d56283a425ccb935033d087bdd0765322d" }
-MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/move-stdlib/", rev = "1a53e3a394731f9b636a2fd51c98dccf8fed6630" }
+MoveStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/move-stdlib/", rev = "devnet" }
 
 
 [addresses]
