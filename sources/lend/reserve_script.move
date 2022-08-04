@@ -106,7 +106,7 @@ module kubera::reserve_script {
 
     }
 
-
+    #[test_only]
     fun init_reserve(source : &signer) {
         base::setup_timestamp(source);
         mock_coin::initialize<mock_coin::WETH>(source, 50);
