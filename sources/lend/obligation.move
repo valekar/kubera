@@ -8,7 +8,7 @@ Design thinking -
 module kubera::obligation {
 
     use aptos_framework::coin;
-    use aptos_framework::coins;
+    //use aptos_framework::coins;
     use kubera::base::LPCoin;
     use std::signer;
     use aptos_framework::account::{Self, SignerCapability};
@@ -181,7 +181,7 @@ module kubera::obligation {
         } else {
 
              if(!coin::is_account_registered<LPCoin<ReserveCoin>>(resource_addr)){
-                coins::register<LPCoin<ReserveCoin>>(&resource_signer);
+                coin::register<LPCoin<ReserveCoin>>(&resource_signer);
             };
             coin::deposit<LPCoin<ReserveCoin>>(resource_addr, lp_coins);
             

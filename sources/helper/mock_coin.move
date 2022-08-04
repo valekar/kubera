@@ -5,7 +5,7 @@ module kubera::mock_coin {
     use aptos_framework::type_info;
     use std::string::{Self};
     use std::signer;
-    use aptos_framework::coins;
+    //use aptos_framework::coins;
 
 
     spec module {
@@ -48,7 +48,7 @@ module kubera::mock_coin {
             decimals,
             true
         );
-        coins::register<TokenType>(account);
+        coin::register<TokenType>(account);
 
         move_to(account, TokenSharedCapability { mint: mint_capability, burn: burn_capability });
     }
@@ -70,7 +70,7 @@ module kubera::mock_coin {
     public fun faucet_mint_to<TokenType>(to: &signer, amount: u64) acquires TokenSharedCapability {
         let to_addr = signer::address_of(to);
         if (!coin::is_account_registered<TokenType>(to_addr)) {
-            coins::register<TokenType>(to);
+            coin::register<TokenType>(to);
         };
         let coin = mint<TokenType>(amount);
         coin::deposit(to_addr, coin);
