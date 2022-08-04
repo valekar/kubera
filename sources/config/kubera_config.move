@@ -1,6 +1,7 @@
 module kubera::kubera_config {
 
     use std::signer;
+    use aptos_framework::account;
 
     const KUBERA_ADDRESS:address = @0x01;
 
@@ -24,6 +25,13 @@ module kubera::kubera_config {
 
     public fun kubera_address() : address {
         KUBERA_ADDRESS
+    }
+
+
+    public fun create_account_if_not_existing(addr : address)  {
+         if(!account::exists_at(addr)) {
+            account::create_account(addr);
+         };
     }
 
 

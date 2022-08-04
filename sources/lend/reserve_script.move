@@ -58,10 +58,10 @@ module kubera::reserve_script {
     use kubera::base;
     #[test_only]
     use std::debug;
-     #[test_only]
-    use aptos_framework::coin;
     // #[test_only]
-    // use aptos_framework::signer;
+    //use aptos_framework::coin;
+   // #[test_only]
+    //use aptos_framework::signer;
 
     #[test(source = @kubera)]
     public entry fun init_reserve_test(source : &signer) {
@@ -111,7 +111,7 @@ module kubera::reserve_script {
 
         base::setup_timestamp(source);
         mock_coin::initialize<mock_coin::WETH>(source, 50);
-        coin::register_for_test<mock_coin::WETH>(source);
+        //coin::register_for_test<mock_coin::WETH>(source);
         init_reserve_script<mock_coin::WETH>(
             source,
             string::utf8(b"WETH Reserve"), 
